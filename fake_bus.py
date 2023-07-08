@@ -37,7 +37,7 @@ class FakeBusGenerator:
         self.websockets_number = websockets_number
         self.refresh_timeout = refresh_timeout
         self.routes = []
-        trio.run(self._get_routes)
+        self._get_routes()
 
     @relaunch_on_disconnect(timeout=2)
     def run(self):
@@ -57,27 +57,22 @@ class FakeBusGenerator:
         finally:
             await self._close_channels()
 
-    async def _get_routes(self):
+    def _get_routes(self):
         routes = os.listdir(self.routes_dir)
         random.shuffle(routes)
-        async with trio.open_nursery() as nursery:
-            for route in routes:
-                rout_file_path = os.path.join(self.routes_dir, route)
-                if not self._routes_is_full:
-                    nursery.start_soon(self._read_route_from_file, rout_file_path)
+        for route in routes:
+            rout_file_path = os.path.join(self.routes_dir, route)
+            with open(rout_file_path, encoding='utf8') as f:
+                route_raw = f.read()
+                try:
+                    route_data = json.loads(route_raw)
+                except JSONDecodeError:
+                    logging.warning(f'Cannot read route data from {rout_file_path}')
                 else:
-                    break
-
-    async def _read_route_from_file(self, rout_file_path: str):
-        async with await trio.open_file(rout_file_path, encoding='utf8') as f:
-            route_raw = await f.read()
-            try:
-                route_data = json.loads(route_raw)
-            except JSONDecodeError:
-                logging.warning(f'Cannot read route data from {rout_file_path}')
-            else:
-                if not self._routes_is_full:
-                    self.routes.append(route_data)
+                    if not self._routes_is_full:
+                        self.routes.append(route_data)
+                    else:
+                        break
 
     @property
     def _routes_is_full(self) -> bool:
