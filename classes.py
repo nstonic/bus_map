@@ -45,6 +45,12 @@ class Bus:
             "route": self.route
         }
 
+    def __str__(self):
+        return self.bus_id
+
+    def __repr__(self):
+        return str(self.bus_id)
+
 
 @dataclass
 class WindowBounds:

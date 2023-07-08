@@ -1,21 +1,18 @@
 import json
+import logging
 from functools import partial
 
+import click
 import trio
 from trio_websocket import serve_websocket, ConnectionClosed
 
 from classes import Bus, WindowBounds
 
 
-async def run(services: list):
-    async with trio.open_nursery() as nursery:
-        for srv in services:
-            nursery.start_soon(srv)
-
-
 async def listen_browser(ws):
     msg = await ws.get_message()
     bounds = WindowBounds.parse_raw(msg)
+    logging.debug(f'New bounds {msg}')
     return [
         bus.to_dict()
         for bus in Bus.instances
@@ -30,6 +27,7 @@ async def talk_to_browser(request):
         "msgType": "Buses",
         "buses": buses_inside_bounds
     })
+    logging.debug(f'Sending buses: {buses_inside_bounds}')
     await ws.send_message(msg)
     await trio.sleep(1)
 
@@ -39,17 +37,36 @@ async def get_buses(request):
     while True:
         try:
             msg = await buses_ws.get_message()
-            Bus.parse_raw(msg)
+            bus = Bus.parse_raw(msg)
+            logging.debug(f'Receiving bus data for {bus.bus_id}')
         except ConnectionClosed:
             break
 
 
+async def run(services: list):
+    async with trio.open_nursery() as nursery:
+        for srv in services:
+            nursery.start_soon(srv)
+
+
+@click.command()
+@click.option('--buses_port', default=8080, type=int,
+              help='Порт для получения данных об автобусах')
+@click.option('--browser_port', default=8000, type=int,
+              help='Порт для отправки данных в браузер')
+@click.option('--no-log', is_flag=True,
+              help='Отключить логирование')
 def main(
+        buses_port: int,
+        browser_port: int,
+        no_log: bool,
+        browser_host: str = '127.0.0.1',
         buses_host: str = '127.0.0.1',
-        buses_port: int = 8080,
-        host: str = '127.0.0.1',
-        port: int = 8000,
 ):
+    if not no_log:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.disable(logging.FATAL)
     buses_receiving_srv = partial(
         serve_websocket,
         get_buses,
@@ -60,8 +77,8 @@ def main(
     browser_talking_srv = partial(
         serve_websocket,
         talk_to_browser,
-        host,
-        port,
+        browser_host,
+        browser_port,
         ssl_context=None
     )
     trio.run(run, [buses_receiving_srv, browser_talking_srv])

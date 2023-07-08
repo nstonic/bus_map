@@ -73,7 +73,7 @@ class FakeBusGenerator:
             try:
                 route_data = json.loads(route_raw)
             except JSONDecodeError:
-                logging.warning(f'Cannot read route data from {rout_file_path}')
+                logging.debug(f'Cannot read route data from {rout_file_path}')
             else:
                 if not self._routes_stack_is_full:
                     self.all_routes.append(route_data)
@@ -116,6 +116,7 @@ class FakeBusGenerator:
                 await ws.send_message(
                     json.dumps(msg, ensure_ascii=False)
                 )
+                logging.debug('Sending buses')
 
     @staticmethod
     def _get_bus_route(coordinates: list) -> Iterable:
