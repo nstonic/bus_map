@@ -13,7 +13,7 @@ from trio import MemoryReceiveChannel
 
 from trio_websocket import open_websocket_url
 
-from errors import retry_on_connection_error
+from errors import relaunch_on_disconnect
 
 
 class FakeBusGenerator:
@@ -40,11 +40,11 @@ class FakeBusGenerator:
         self.all_routes = []
         trio.run(self._get_routes)
 
-    @retry_on_connection_error(timeout=2)
+    @relaunch_on_disconnect(timeout=2)
     def run(self):
-        trio.run(self.start_sending_buses)
+        trio.run(self.start_generate_buses)
 
-    async def start_sending_buses(self):
+    async def start_generate_buses(self):
         total_buses = len(self.all_routes) * self.buses_per_route
         logging.debug(f'Start sending {total_buses} busses to the server {self.server_address}')
         try:
@@ -102,7 +102,7 @@ class FakeBusGenerator:
         send_channel = random.choice(self.send_channels)
         bus_route = self._get_bus_route(route_data['coordinates'])
         bus_progress = {
-            'busId': self._get_bus_id(route_data["name"], bus_index),
+            'busId': self._get_bus_id(route_data['name'], bus_index),
             'route': route_data['name']
         }
         for position in bus_route:
