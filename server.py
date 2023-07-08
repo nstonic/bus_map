@@ -1,53 +1,71 @@
 import json
 from functools import partial
-from sys import stderr
 
 import trio
 from trio_websocket import serve_websocket, ConnectionClosed
 
-buses = {}
+from classes import Bus, WindowBounds
+
+
+async def run(services: list):
+    async with trio.open_nursery() as nursery:
+        for srv in services:
+            nursery.start_soon(srv)
+
+
+async def listen_browser(ws):
+    msg = await ws.get_message()
+    bounds = WindowBounds.parse_raw(msg)
+    return [
+        bus.to_dict()
+        for bus in Bus.instances
+        if bounds.is_inside(bus)
+    ]
 
 
 async def talk_to_browser(request):
     ws = await request.accept()
-    buses_data = []
-    for bus_id, bus_data in buses.items():
-        bus_data.update({'busId': bus_id})
-        buses_data.append(bus_data)
-    message = json.dumps({
+    buses_inside_bounds = await listen_browser(ws)
+    msg = json.dumps({
         "msgType": "Buses",
-        "buses": buses_data
+        "buses": buses_inside_bounds
     })
-    try:
-        await ws.send_message(
-            message
-        )
-        await trio.sleep(1)
-    except OSError as ose:
-        print('Connection attempt failed: %s' % ose, file=stderr)
+    await ws.send_message(msg)
+    await trio.sleep(1)
 
 
-async def get_busses(request):
-    ws = await request.accept()
+async def get_buses(request):
+    buses_ws = await request.accept()
     while True:
         try:
-            message = await ws.get_message()
-            # print(message)
-            bus_data = json.loads(message)
-            bus_id = bus_data.pop('busId')
-            buses[bus_id] = bus_data
+            msg = await buses_ws.get_message()
+            Bus.parse_raw(msg)
         except ConnectionClosed:
             break
 
 
-async def main():
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(
-            partial(serve_websocket, get_busses, '127.0.0.1', 8080, ssl_context=None)
-        )
-        nursery.start_soon(
-            partial(serve_websocket, talk_to_browser, '127.0.0.1', 8000, ssl_context=None)
-        )
+def main(
+        buses_host: str = '127.0.0.1',
+        buses_port: int = 8080,
+        host: str = '127.0.0.1',
+        port: int = 8000,
+):
+    buses_receiving_srv = partial(
+        serve_websocket,
+        get_buses,
+        buses_host,
+        buses_port,
+        ssl_context=None
+    )
+    browser_talking_srv = partial(
+        serve_websocket,
+        talk_to_browser,
+        host,
+        port,
+        ssl_context=None
+    )
+    trio.run(run, [buses_receiving_srv, browser_talking_srv])
 
 
-trio.run(main)
+if __name__ == '__main__':
+    main()
