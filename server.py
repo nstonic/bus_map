@@ -1,17 +1,30 @@
 import json
 import logging
+from contextlib import suppress
 from functools import partial
+from typing import Optional
 
 import click
 import trio
 from trio_websocket import serve_websocket, ConnectionClosed
 
 from classes import Bus, WindowBounds
+from errors import ParsingError
+
+bus_dicts = list[dict]
 
 
-async def listen_browser(ws):
+async def listen_browser(ws) -> Optional[bus_dicts]:
     msg = await ws.get_message()
-    bounds = WindowBounds.parse_raw(msg)
+    try:
+        bounds = WindowBounds.parse_raw(msg)
+    except ParsingError as ex:
+        error_msg = json.dumps(
+            {'msgType': 'Errors', 'errors': str(ex)}
+        )
+        logging.debug(error_msg)
+        await ws.send_message(error_msg)
+        return
     logging.debug(f'New bounds {msg}')
     return [
         bus.to_dict()
@@ -23,24 +36,29 @@ async def listen_browser(ws):
 async def talk_to_browser(request):
     ws = await request.accept()
     buses_inside_bounds = await listen_browser(ws)
-    msg = json.dumps({
-        "msgType": "Buses",
-        "buses": buses_inside_bounds
-    })
-    logging.debug(f'Sending buses: {buses_inside_bounds}')
-    await ws.send_message(msg)
-    await trio.sleep(1)
+    if buses_inside_bounds:
+        msg = json.dumps({
+            "msgType": "Buses",
+            "buses": buses_inside_bounds
+        })
+        logging.debug(f'Sending buses: {buses_inside_bounds}')
+        await ws.send_message(msg)
 
 
 async def get_buses(request):
-    buses_ws = await request.accept()
+    ws = await request.accept()
     while True:
+        msg = await ws.get_message()
         try:
-            msg = await buses_ws.get_message()
             bus = Bus.parse_raw(msg)
-            logging.debug(f'Receiving bus data for {bus.bus_id}')
-        except ConnectionClosed:
-            break
+        except ParsingError as ex:
+            error_msg = json.dumps(
+                {'msgType': 'Errors', 'errors': str(ex)}
+            )
+            logging.debug(error_msg)
+            await ws.send_message(error_msg)
+            continue
+        logging.debug(f'Receiving bus data for {bus.bus_id}')
 
 
 async def run(services: list):
@@ -80,7 +98,8 @@ def main(
         browser_port,
         ssl_context=None
     )
-    trio.run(run, [buses_receiving_srv, browser_talking_srv])
+    with suppress(KeyboardInterrupt, ConnectionClosed):
+        trio.run(run, [buses_receiving_srv, browser_talking_srv])
 
 
 if __name__ == '__main__':

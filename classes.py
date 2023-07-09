@@ -1,4 +1,7 @@
 import json
+from json import JSONDecodeError
+
+from errors import ParsingError, check_input_data, check_input_bounds
 
 
 class Bus:
@@ -25,7 +28,14 @@ class Bus:
 
     @classmethod
     def parse_raw(cls, raw: str):
-        bus_data = json.loads(raw)
+        try:
+            bus_data = json.loads(raw)
+        except JSONDecodeError as ex:
+            raise ParsingError(str(ex))
+        check_input_data(
+            bus_data,
+            {'busId': str, 'lat': float, 'lng': float, 'route': str}
+        )
         return cls(
             bus_id=bus_data['busId'],
             lat=bus_data['lat'],
@@ -39,10 +49,10 @@ class Bus:
 
     def to_dict(self):
         return {
-            "busId": self.bus_id,
-            "lat": self.lat,
-            "lng": self.lng,
-            "route": self.route
+            'busId': self.bus_id,
+            'lat': self.lat,
+            'lng': self.lng,
+            'route': self.route
         }
 
     def __str__(self):
@@ -74,7 +84,14 @@ class WindowBounds:
 
     @classmethod
     def parse_raw(cls, raw: str):
-        bounds_data = json.loads(raw)
+        try:
+            bounds_data = json.loads(raw)
+        except JSONDecodeError as ex:
+            raise ParsingError(str(ex))
+        check_input_bounds(
+            bounds_data,
+            {'east_lng': float, 'north_lat': float, 'south_lat': float, 'west_lng': float}
+        )
         return cls(
             east_lng=bounds_data['data']['east_lng'],
             north_lat=bounds_data['data']['north_lat'],
