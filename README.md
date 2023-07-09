@@ -6,7 +6,22 @@
 
 ## Как запустить
 
-- Скачайте код
+- Скачайте код и установить зависимости `pip install -r requirements.txt`
+- Запустите сервер:`python server.py [-h] [--buses_port] [--browser_port] [--no-log]`
+  - `--buses_port` - Порт для получения данных об автобусах
+  - `--browser_port` - Порт для отправки данных в браузер    
+  - `--no-log` - Отключить логирование
+
+- Запустите клиент для генерации данных:`python fake_bus.py [-h] [--server] [--routes_dir] [--routes_number] [--buses_per_route] [--websockets_number] [--emulator_id] [--refresh_timeout] [--no-log]`
+  - `--server` - Адрес сервера
+  - `--routes_dir` - Папка с json-ами маршрутов
+  - `--routes_number` - Количество маршрутов
+  - `--buses_per_route` - Количество автобусов на каждом маршруте
+  - `--websockets_number` - Количество открытых веб-сокетов
+  - `--emulator_id` - Префикс к busId на случай запуска нескольких экземпляров имитатора
+  - `--refresh_timeout` - Задержка в обновлении координат сервера в секундах
+  - `--no-log` - Отключить логирование
+
 - Откройте в браузере файл index.html
 
 
