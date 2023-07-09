@@ -15,7 +15,7 @@ async def listen_browser(ws):
     logging.debug(f'New bounds {msg}')
     return [
         bus.to_dict()
-        for bus in Bus.instances
+        for bus in Bus.get_all_buses()
         if bounds.is_inside(bus)
     ]
 

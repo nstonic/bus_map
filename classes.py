@@ -1,24 +1,20 @@
 import json
-from dataclasses import dataclass
 
 
 class Bus:
-    instances = []
+    _instances = {}
 
     def __new__(cls, *args, **kwargs):
         """
         Запрещаем создание экземпляров с одинаковыми bus_id.
-        Заодно получаем список всех экземпляров.
+        Заодно получаем перечень всех экземпляров.
         """
-        bus_id = kwargs.get('bus_id') or args[0]
+        bus_id = kwargs.get('bus_id', args[0])
         try:
-            instance = next(filter(
-                lambda bus: bus.bus_id == bus_id,
-                cls.instances
-            ))
-        except StopIteration:
+            instance = cls._instances[bus_id]
+        except KeyError:
             instance = super().__new__(cls)
-            cls.instances.append(instance)
+            cls._instances[bus_id] = instance
         return instance
 
     def __init__(self, bus_id, route, lat, lng):
@@ -37,6 +33,10 @@ class Bus:
             route=bus_data['route']
         )
 
+    @classmethod
+    def get_all_buses(cls):
+        return cls._instances.values()
+
     def to_dict(self):
         return {
             "busId": self.bus_id,
@@ -52,12 +52,25 @@ class Bus:
         return str(self.bus_id)
 
 
-@dataclass
 class WindowBounds:
-    east_lng: float
-    north_lat: float
-    south_lat: float
-    west_lng: float
+
+    def __init__(
+            self,
+            east_lng: float,
+            north_lat: float,
+            south_lat: float,
+            west_lng: float,
+    ):
+        """
+        Немного расширим границы окна, чтобы автобусы уходили за его пределы и приходили от туда,
+        а не исчезали и появлялись
+        """
+        horizontal_window_size = east_lng - west_lng
+        vertical_window_size = north_lat - south_lat
+        self.south_border = south_lat - vertical_window_size / 2
+        self.north_border = north_lat + vertical_window_size / 2
+        self.west_border = west_lng - horizontal_window_size / 2
+        self.east_border = east_lng + horizontal_window_size / 2
 
     @classmethod
     def parse_raw(cls, raw: str):
@@ -71,6 +84,6 @@ class WindowBounds:
 
     def is_inside(self, bus: Bus) -> bool:
         return all([
-            self.south_lat < bus.lat < self.north_lat,
-            self.west_lng < bus.lng < self.east_lng
+            self.south_border < bus.lat < self.north_border,
+            self.west_border < bus.lng < self.east_border
         ])
