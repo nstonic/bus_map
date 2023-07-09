@@ -63,10 +63,9 @@ def main(
         browser_host: str = '127.0.0.1',
         buses_host: str = '127.0.0.1',
 ):
-    if not no_log:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
+    if no_log:
         logging.disable(logging.FATAL)
+
     buses_receiving_srv = partial(
         serve_websocket,
         get_buses,

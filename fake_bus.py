@@ -152,9 +152,7 @@ def main(
         refresh_timeout: int,
         no_log: bool
 ):
-    if not no_log:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
+    if no_log:
         logging.disable(logging.FATAL)
 
     bus_generator = FakeBusGenerator(
