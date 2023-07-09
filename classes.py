@@ -9,7 +9,7 @@ class Bus:
         Запрещаем создание экземпляров с одинаковыми bus_id.
         Заодно получаем перечень всех экземпляров.
         """
-        bus_id = kwargs.get('bus_id', args[0])
+        bus_id = kwargs.get('bus_id') or args[0]
         try:
             instance = cls._instances[bus_id]
         except KeyError:
