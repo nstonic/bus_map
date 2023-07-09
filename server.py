@@ -36,7 +36,7 @@ async def listen_browser(ws) -> Optional[bus_dicts]:
 async def talk_to_browser(request):
     ws = await request.accept()
     buses_inside_bounds = await listen_browser(ws)
-    if buses_inside_bounds:
+    if buses_inside_bounds is not None:
         msg = json.dumps({
             "msgType": "Buses",
             "buses": buses_inside_bounds
